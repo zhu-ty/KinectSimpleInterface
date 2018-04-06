@@ -170,6 +170,7 @@ int KinectSimple::capture_color_mat(cv::Mat & dst)
 		{
 			pBuffer = m_pColorRGBX;
 			nBufferSize = cColorWidth * cColorHeight * sizeof(RGBQUAD);
+			//TODO:ÎªÉ¶²»ÊÇRGBA£¿£¨ColorImageFormat_Rgba£©
 			hr = pColorFrame->CopyConvertedFrameDataToArray(nBufferSize, reinterpret_cast<BYTE*>(pBuffer), ColorImageFormat_Bgra);
 		}
 		else
