@@ -4,6 +4,15 @@
 
 using namespace cv;
 
+int get_pt_depth_13(Mat &d, int x, int y)
+{
+	int d16 = 0;
+	memcpy(&d16, d.data + (y * d.cols + x) * 2, 2);
+	d16 = d16 & 0xfff8;
+	d16 = d16 >> 3;
+	return d16;
+}
+
 int main()
 {
 	KinectSimple kinect;
