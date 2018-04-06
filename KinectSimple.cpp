@@ -8,6 +8,7 @@ KinectSimple::KinectSimple()
 
 	m_pDepthRGBX = new RGBQUAD[cDepthWidth * cDepthHeight];// create heap storage for color pixel data in RGBX format  ，开辟一个动态存储区域  
 	m_pColorRGBX = new RGBQUAD[cColorWidth * cColorHeight];
+	_depth_space_calibrate.resize(cColorWidth * cColorHeight);
 }
 
 KinectSimple::~KinectSimple()
@@ -75,7 +76,7 @@ int KinectSimple::init()
 		return -1;
 }
 
-int KinectSimple::capture_depth_mat(cv::Mat & dst)
+int KinectSimple::capture_depth_mat(cv::Mat & dst, cv::Mat & dst_show)
 {
 	int ret = -1;
 	if (!m_pDepthFrameReader)
@@ -106,9 +107,9 @@ int KinectSimple::capture_depth_mat(cv::Mat & dst)
 		//ProcessDepth(pBuffer, nWidth, nHeight, nDepthMinReliableDistance, nDepthMaxDistance);
 		if (m_pDepthRGBX && pBuffer && (nWidth == cDepthWidth) && (nHeight == cDepthHeight))
 		{
-#ifdef SHOW_DEPTH_255
-			RGBQUAD* pRGBX = m_pDepthRGBX;  
+			RGBQUAD* pRGBX = m_pDepthRGBX;
 			const UINT16* pBufferEnd = pBuffer + (nWidth * nHeight);
+			UINT16* pBuffer_copy = pBuffer;
 			while (pBuffer < pBufferEnd)
 			{
 				//TODO:这个深度图的映射方式有待商榷
@@ -127,11 +128,11 @@ int KinectSimple::capture_depth_mat(cv::Mat & dst)
 				++pBuffer;
 			}
 			// Draw the data with OpenCV  
-			cv::Mat DepthImage(nHeight, nWidth, CV_8UC4, m_pDepthRGBX);
-#else
-			cv::Mat DepthImage(nHeight, nWidth, CV_16UC1, pBuffer);
-#endif
+			cv::Mat DepthImage_SHOW(nHeight, nWidth, CV_8UC4, m_pDepthRGBX);
+			cv::Mat DepthImage(nHeight, nWidth, CV_16UC1, pBuffer_copy);
+			dst_show = DepthImage_SHOW.clone();
 			dst = DepthImage.clone();
+			
 			ret = 0;
 		}
 		SysUtil::SafeRelease(pFrameDescription);
@@ -189,7 +190,54 @@ int KinectSimple::capture_color_mat(cv::Mat & dst)
 	return ret;
 }
 
-int KinectSimple::blend_color_with_depth(cv::Mat & depth, cv::Mat & color, cv::Mat & dst)
+int KinectSimple::get_mapped_depth_in_color_space(cv::Mat &depth, cv::Mat &color, cv::Mat &dst, cv::Mat &dst_show)
 {
+	
+	cv::Mat _dst(cColorHeight, cColorWidth, CV_16UC1);
+	memset(_dst.data, 0, cColorHeight*cColorWidth * 2);//Set all to 0
+	cv::Mat _dst_show = color.clone();
+
+	cv::Mat _depth = depth;
+	if (depth.isContinuous() == false)
+		_depth = depth.clone();
+
+	_mapper->MapColorFrameToDepthSpace(
+		cDepthWidth * cDepthHeight,
+		(UINT16 *)(_depth.data),
+		cColorWidth * cColorHeight,
+		_depth_space_calibrate.data());
+
+
+	for (int i = 0; i < cColorHeight; i++)
+	{
+		for (int j = 0; j < cColorWidth; j++)
+		{
+			float x = _depth_space_calibrate[i * cColorWidth + j].X;
+			float y = _depth_space_calibrate[i * cColorWidth + j].Y;
+			if (!isinf(x) && !isinf(y) && x >= 0 && x <= cDepthWidth && y >= 0 && y <= cDepthHeight)
+			{
+				//TODO: havent test
+				memcpy(
+					_dst.data + (i * cColorWidth + j) * 2,
+					depth.data + ((int)(y + 0.5) * cDepthWidth + (int)(x + 0.5)) * 2,
+					2);
+
+				memset(_dst_show.data + (i * cColorWidth + j) * 4,
+					*(depth.data + ((int)(y + 0.5) * cDepthWidth + (int)(x + 0.5)) * 2),
+					4);
+			}
+		}
+	}
+	dst = _dst.clone();
+	dst_show = _dst_show.clone();
 	return 0;
 }
+
+
+//std::vector<ColorSpacePoint> csp(cDepthWidth * cDepthHeight);
+//_mapper->MapDepthFrameToColorSpace(
+//	cDepthWidth * cDepthHeight,
+//	(UINT16 *)(_depth.data),
+//	cDepthWidth * cDepthHeight,
+//	csp.data()
+//);

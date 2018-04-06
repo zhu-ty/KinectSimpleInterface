@@ -15,7 +15,7 @@ A super simple interface for Kinect and OpenCV
 #include <Kinect.h>
 #include "opencv2/opencv.hpp" 
 
-#define SHOW_DEPTH_255
+//#define SHOW_DEPTH_255
 
 
 namespace SysUtil
@@ -40,9 +40,10 @@ public:
 	~KinectSimple();
 
     int init();
-    int capture_depth_mat(cv::Mat &dst);
+    int capture_depth_mat(cv::Mat &dst, cv::Mat & dst_show);
     int capture_color_mat(cv::Mat &dst);
-    int blend_color_with_depth(cv::Mat &depth, cv::Mat &color, cv::Mat &dst);
+	int get_mapped_depth_in_color_space(cv::Mat &depth, cv::Mat &color, cv::Mat &dst, cv::Mat &dst_show);
+    
 private:
 	static const int cDepthWidth = 512;   //深度图的大小  
 	static const int cDepthHeight = 424;
@@ -56,7 +57,8 @@ private:
 	RGBQUAD*                m_pColorRGBX;
 
 	ICoordinateMapper* _mapper;
-	ColorSpacePoint p;
+
+	std::vector<DepthSpacePoint> _depth_space_calibrate;
 };
 
 #endif //__KINECT_SIMPLE__
